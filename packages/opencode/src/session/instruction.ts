@@ -8,6 +8,7 @@ import { Flag } from "@/flag/flag"
 import { Log } from "../util/log"
 import { Glob } from "../util/glob"
 import type { MessageV2 } from "./message-v2"
+import { ContextMap } from "../util/context-map"
 
 const log = Log.create({ service: "instruction" })
 
@@ -111,7 +112,21 @@ export namespace InstructionPrompt {
       }
     }
 
-    return paths
+    // Add context paths from .brain/settings.json
+    const brainContextPatterns = await ContextMap.contextPatterns()
+    for (const pattern of brainContextPatterns) {
+      const matches = await Glob.scan(pattern, {
+        cwd: Instance.directory,
+        absolute: true,
+        include: "file",
+        dot: true,
+      }).catch(() => [])
+      matches.forEach((p) => {
+        paths.add(path.resolve(p))
+      })
+    }
+
+    return ContextMap.filterPaths(paths)
   }
 
   export async function system() {
@@ -177,7 +192,7 @@ export namespace InstructionPrompt {
     while (current.startsWith(root) && current !== root) {
       const found = await find(current)
 
-      if (found && found !== target && !system.has(found) && !already.has(found) && !isClaimed(messageID, found)) {
+      if (found && found !== target && !system.has(found) && !already.has(found) && !isClaimed(messageID, found) && !(await ContextMap.isIgnored(found))) {
         claim(messageID, found)
         const content = await Filesystem.readText(found).catch(() => undefined)
         if (content) {

@@ -15,6 +15,7 @@ import { Glob } from "../util/glob"
 import { pathToFileURL } from "url"
 import type { Agent } from "@/agent/agent"
 import { PermissionNext } from "@/permission/next"
+import { ContextMap } from "@/util/context-map"
 import { InstanceContext } from "@/effect/instance-context"
 import { Effect, Layer, ServiceMap } from "effect"
 import { runPromiseInstance } from "@/effect/runtime"
@@ -168,13 +169,18 @@ export class SkillService extends ServiceMap.Service<SkillService, SkillService.
           // Load global (home) first, then project-level (so project-level overwrites)
           if (!Flag.OPENCODE_DISABLE_EXTERNAL_SKILLS) {
             for (const dir of EXTERNAL_DIRS) {
+              if (await ContextMap.isExternalDirIgnored(dir)) continue
               const root = path.join(Global.Path.home, dir)
               if (!(await Filesystem.isDir(root))) continue
               await scanExternal(root, "global")
             }
 
+            const allowedExternalDirs: string[] = []
+            for (const dir of EXTERNAL_DIRS) {
+              if (!(await ContextMap.isExternalDirIgnored(dir))) allowedExternalDirs.push(dir)
+            }
             for await (const root of Filesystem.up({
-              targets: EXTERNAL_DIRS,
+              targets: allowedExternalDirs,
               start: instance.directory,
               stop: instance.project.worktree,
             })) {
