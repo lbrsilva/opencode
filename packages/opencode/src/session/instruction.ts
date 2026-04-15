@@ -10,6 +10,7 @@ import { withTransientReadRetry } from "@/util/effect-http-client"
 import { Global } from "../global"
 import { Instance } from "../project/instance"
 import { Log } from "../util/log"
+import { ContextMap } from "../util/context-map"
 import type { MessageV2 } from "./message-v2"
 import type { MessageID } from "./schema"
 
@@ -157,7 +158,9 @@ export namespace Instruction {
             }
           }
 
-          return paths
+          const contextConfig = yield* cfg.get()
+          const excludePatterns = contextConfig.context?.exclude ?? []
+          return ContextMap.filterPaths(paths, excludePatterns)
         })
 
         const system = Effect.fn("Instruction.system")(function* () {
@@ -201,6 +204,13 @@ export namespace Instruction {
           while (current.startsWith(root) && current !== root) {
             const found = yield* find(current)
             if (!found || found === target || sys.has(found) || already.has(found)) {
+              current = path.dirname(current)
+              continue
+            }
+
+            const resolveConfig = yield* cfg.get()
+            const resolveExclude = resolveConfig.context?.exclude ?? []
+            if (ContextMap.isIgnored(found, resolveExclude)) {
               current = path.dirname(current)
               continue
             }
