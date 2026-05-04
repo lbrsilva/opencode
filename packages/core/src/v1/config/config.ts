@@ -124,6 +124,16 @@ export const Info = Schema.Struct({
   instructions: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
     description: "Additional instruction files or patterns to include",
   }),
+  context: Schema.optional(
+    Schema.Struct({
+      exclude: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
+        description: "Glob patterns for instruction files or directories to exclude from automatic loading",
+      }),
+      include: Schema.optional(Schema.mutable(Schema.Array(Schema.String))).annotate({
+        description: "Glob patterns for additional instruction files to include",
+      }),
+    }),
+  ).annotate({ description: "Control which instruction files are automatically loaded" }),
   layout: Schema.optional(ConfigLayoutV1.Layout).annotate({ description: "@deprecated Always uses stretch layout." }),
   permission: Schema.optional(ConfigPermissionV1.Info),
   tools: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)),

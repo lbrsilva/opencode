@@ -11,6 +11,7 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { withTransientReadRetry } from "@/util/effect-http-client"
 import { Global } from "@opencode-ai/core/global"
+import { ContextMap } from "@/util/context-map"
 import type { MessageV2 } from "./message-v2"
 import type { MessageID } from "./schema"
 
@@ -149,7 +150,15 @@ const layer: Layer.Layer<
         }
       }
 
-      return paths
+      // Process context.include patterns
+      for (const pattern of ContextMap.contextPatterns(config)) {
+        const includeMatches = yield* relative(pattern).pipe(
+          Effect.catch(() => Effect.succeed([] as string[])),
+        )
+        includeMatches.forEach((item) => paths.add(path.resolve(item)))
+      }
+
+      return ContextMap.filterPaths(config, ctx.directory, paths)
     })
 
     const system = Effect.fn("Instruction.system")(function* () {
@@ -181,6 +190,7 @@ const layer: Layer.Layer<
       filepath: string,
       messageID: MessageID,
     ) {
+      const config = yield* cfg.get()
       const sys = yield* systemPaths()
       const already = extract(messages)
       const results: { filepath: string; content: string }[] = []
@@ -194,6 +204,11 @@ const layer: Layer.Layer<
       while (current.startsWith(root) && current !== root) {
         const found = yield* find(current)
         if (!found || found === target || sys.has(found) || already.has(found)) {
+          current = path.dirname(current)
+          continue
+        }
+
+        if (ContextMap.isIgnored(config, root, found)) {
           current = path.dirname(current)
           continue
         }
