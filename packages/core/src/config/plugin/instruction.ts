@@ -12,6 +12,7 @@ import { Watcher } from "../../filesystem/watcher.js"
 import { InstructionDiscovery } from "../../instruction-discovery.js"
 import { Instructions } from "../../instructions/index.js"
 import { Location } from "../../location.js"
+import { ContextMap } from "../../util/context-map.js"
 
 type Loaded =
   | { readonly type: "available"; readonly files: InstructionDiscovery.File[] }
@@ -40,9 +41,14 @@ export const Plugin = define({
       const stop = FSUtil.contains(home, start) ? home : root
       const globalFile = yield* fs.resolve(join(global.config, "AGENTS.md"))
       const loaded: { current: Loaded } = { current: { type: "available", files: [] } }
-      const configured: { sources: string[]; remote: Map<string, InstructionDiscovery.File> } = {
+      const configured: {
+        sources: string[]
+        remote: Map<string, InstructionDiscovery.File>
+        context: ContextMap.Context
+      } = {
         sources: [],
         remote: new Map(),
+        context: { exclude: [], include: [] },
       }
 
       const publish = (update: Watcher.Update) => PubSub.publish(changes, update.path).pipe(Effect.asVoid)
@@ -135,8 +141,12 @@ export const Plugin = define({
       const reconfigure = Effect.fn("ConfigInstructionPlugin.reconfigure")(
         function* () {
           const entries = yield* config.entries()
+          const context = ContextMap.of(entries)
           const sources = Array.from(
-            new Set(entries.flatMap((entry) => (entry.type === "document" ? (entry.info.instructions ?? []) : []))),
+            new Set([
+              ...entries.flatMap((entry) => (entry.type === "document" ? (entry.info.instructions ?? []) : [])),
+              ...context.include,
+            ]),
           )
           const fetched = yield* Effect.forEach(
             sources.filter(isUrl),
@@ -155,6 +165,7 @@ export const Plugin = define({
             { concurrency: 4 },
           )
           configured.sources = sources
+          configured.context = context
           configured.remote = new Map(
             fetched.filter((file) => file !== undefined).map((file) => [file.path, file] as const),
           )
@@ -178,10 +189,13 @@ export const Plugin = define({
             project: isolate("project", projectSource()),
             configured: isolate("configured", configuredSource()),
           })
-          loaded.current =
-            Array.isArray(sources.global) && Array.isArray(sources.project) && Array.isArray(sources.configured)
-              ? { type: "available", files: [...sources.global, ...sources.project, ...sources.configured] }
-              : { type: "unavailable" }
+          if (Array.isArray(sources.global) && Array.isArray(sources.project) && Array.isArray(sources.configured)) {
+            const files = [...sources.global, ...sources.project, ...sources.configured]
+            const keep = ContextMap.filterPaths(configured.context, start, files.map((file) => file.path))
+            loaded.current = { type: "available", files: files.filter((file) => keep.has(file.path)) }
+          } else {
+            loaded.current = { type: "unavailable" }
+          }
           if (!file) return
           yield* Effect.logDebug("instructions rescanned", {
             file,
