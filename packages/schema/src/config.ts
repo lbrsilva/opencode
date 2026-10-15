@@ -94,6 +94,16 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   instructions: Schema.String.pipe(Schema.Array, optional).annotate({
     description: "Additional paths or URLs supplying ambient instructions",
   }),
+  context: Schema.Struct({
+    exclude: Schema.String.pipe(Schema.Array, optional).annotate({
+      description: "Glob patterns for instruction files or skill directories to exclude from automatic loading",
+    }),
+    include: Schema.String.pipe(Schema.Array, optional).annotate({
+      description: "Glob patterns for additional instruction files to include",
+    }),
+  })
+    .pipe(optional)
+    .annotate({ description: "Control which instruction files and external skill directories are automatically loaded" }),
   references: ConfigReference.Info.pipe(optional).annotate({
     description: "Named local directories or Git repositories available as external context",
   }),
