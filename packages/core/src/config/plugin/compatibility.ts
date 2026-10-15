@@ -7,6 +7,7 @@ import { Effect, FiberMap, PubSub, Semaphore, Stream } from "effect"
 import { Config } from "../../config.js"
 import { Watcher } from "../../filesystem/watcher.js"
 import { Skill } from "../../skill.js"
+import { ContextMap } from "../../util/context-map.js"
 import { SkillFile } from "./skill-file.js"
 import { SkillScan } from "./skill-scan.js"
 
@@ -40,7 +41,10 @@ export const Plugin = define({
       function* () {
         yield* FiberMap.clear(watches)
         const roots = config.compatibility ? yield* config.compatibility() : { claude: [], agents: [] }
-        const directories = [...roots.claude, ...roots.agents].map((root) => path.join(root, "skills"))
+        const context = ContextMap.of(yield* config.entries())
+        const directories = [...roots.claude, ...roots.agents]
+          .map((root) => path.join(root, "skills"))
+          .filter((directory) => !ContextMap.isExternalDirIgnored(context, directory))
         const loaded = new Map<Skill.ID, Skill.Info>()
         for (const directory of directories) {
           const resolved = yield* fs.realPath(directory).pipe(Effect.orElseSucceed(() => undefined))
