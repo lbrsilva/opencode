@@ -23,6 +23,7 @@ import { Job } from "@opencode/core/job"
 import { Mcp } from "@opencode/core/mcp/index"
 import { Global } from "@opencode/util/global"
 import { FSUtil } from "@opencode/util/fs-util"
+import { networkVersion } from "@opencode/util/network-version"
 import { InstructionDiscovery } from "@opencode/core/instruction-discovery"
 import { LocationServiceMap } from "@opencode/core/location-service-map"
 import { LocationActivity } from "@opencode/core/location-activity"
@@ -136,7 +137,7 @@ function makeRoutes<AuthError, AuthServices>(
       Mcp.configured({
         clientInfo: {
           name: "opencode",
-          version: options.app?.version ?? "unknown",
+          version: networkVersion(options.app?.version ?? "unknown"),
         },
       }),
     ),

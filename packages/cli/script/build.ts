@@ -3,12 +3,13 @@
 import { $ } from "bun"
 import { mkdir, rm } from "fs/promises"
 import path from "path"
+import type { BunPlugin } from "bun"
+import { discoverPluginRuntimeSpecifiers, pluginRuntimeLoaderCode } from "@opencode/plugin/runtime-modules"
 import { Script } from "@opencode/script"
 import { embed } from "@opencode/script/highlights"
+import { networkVersion } from "@opencode/util/network-version"
 import { createSolidTransformPlugin } from "@opentui/solid/bun-plugin"
-import type { BunPlugin } from "bun"
 import pkg from "../package.json"
-import { discoverPluginRuntimeSpecifiers, pluginRuntimeLoaderCode } from "@opencode/plugin/runtime-modules"
 import { buildAppArchive } from "./app-assets"
 import { verifyArtifact, verifySimulationGraph } from "./verify-artifact"
 import { resolveOpencodePty } from "./opencode-pty"
@@ -181,7 +182,7 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
       outfile: path.join(outdir, name, "bin", binary),
       execArgv: [
         "--smol",
-        `--user-agent=opencode/${Script.channel}/${Script.version}/cli`,
+        `--user-agent=opencode/${Script.channel}/${networkVersion(Script.version)}/cli`,
         "--use-system-ca",
         "--no-warnings",
         "--",
